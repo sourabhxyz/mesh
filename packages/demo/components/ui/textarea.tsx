@@ -2,7 +2,6 @@ const Textarea = ({
   value,
   onChange,
   placeholder = '',
-  type = 'text',
   className = '',
   disabled = false,
   rows = 4,
@@ -21,6 +20,7 @@ const Textarea = ({
       value={value}
       onChange={onChange}
       disabled={disabled}
+      placeholder={placeholder}
     ></textarea>
   );
 };
