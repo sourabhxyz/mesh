@@ -23,10 +23,14 @@ import {
   ArrowsPointingInIcon,
   CloudIcon,
   FilmIcon,
+  UserIcon,
 } from '@heroicons/react/24/solid';
 import SvgGithub from '../svgs/github';
 import SvgMesh from '../svgs/mesh';
 import { useRouter } from 'next/router';
+import LoginModal from './loginModal';
+import useAuth from '../../contexts/auth';
+import { useUser } from '@supabase/auth-helpers-react';
 
 export default function Navbar() {
   const [darkMode, setDarkMode] = useLocalStorage('darkmode', false);
@@ -64,7 +68,7 @@ export default function Navbar() {
   }, [router.asPath]);
 
   return (
-    <header>
+    <>
       <nav className="border-gray-200 px-4 lg:px-6 py-2.5 fixed z-30 w-full border-b dark:border-gray-700 bg-white/80 backdrop-blur dark:bg-gray-800/80">
         <div className="flex flex-wrap justify-between items-center mx-auto max-w-screen-xl">
           <a href="/" className="flex items-center">
@@ -81,6 +85,7 @@ export default function Navbar() {
             </span>
           </a>
           <div className="flex items-center lg:order-2">
+            <User />
             <a
               href="https://github.com/MeshJS/mesh"
               target="_blank"
@@ -137,7 +142,8 @@ export default function Navbar() {
           </div>
         </div>
       </nav>
-    </header>
+      <LoginModal />
+    </>
   );
 }
 
@@ -467,5 +473,23 @@ function NavLink({ href, label }) {
         </span>
       </Link>
     </li>
+  );
+}
+
+function User() {
+  const { setShowLoginModal } = useAuth();
+  const user = useUser();
+  console.log('user', user);
+
+  return (
+    <button
+      type="button"
+      className="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none rounded-lg text-sm p-2.5"
+      onClick={() => {
+        setShowLoginModal(true);
+      }}
+    >
+      <UserIcon className="h-4 w-4 text-gray-500" />
+    </button>
   );
 }
