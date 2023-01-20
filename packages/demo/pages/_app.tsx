@@ -11,6 +11,10 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import * as ga from '../lib/ga';
 import Scroller from '../components/site/scroller';
+import { AuthProvider } from '../contexts/auth';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { SessionContextProvider } from '@supabase/auth-helpers-react';
+import { useState } from 'react';
 
 function MyApp({ Component, pageProps }: AppProps) {
   /**
@@ -27,23 +31,35 @@ function MyApp({ Component, pageProps }: AppProps) {
     };
   }, [router.events]);
 
+  /**
+   * Supabase
+   */
+  const [supabaseClient] = useState(() => createBrowserSupabaseClient());
+
   return (
-    <MeshProvider>
-      <AppWalletProvider>
-        <DemoProvider>
-          <div className="cursor-default">
-            <header>
-              <Navbar />
-            </header>
-            <main className="pt-16 bg-white dark:bg-gray-900">
-              <Component {...pageProps} />
-            </main>
-            <Footer />
-            <Scroller />
-          </div>
-        </DemoProvider>
-      </AppWalletProvider>
-    </MeshProvider>
+    <SessionContextProvider
+      supabaseClient={supabaseClient}
+      initialSession={pageProps.initialSession}
+    >
+      <MeshProvider>
+        <AuthProvider>
+          <AppWalletProvider>
+            <DemoProvider>
+              <div className="cursor-default">
+                <header>
+                  <Navbar />
+                </header>
+                <main className="pt-16 bg-white dark:bg-gray-900">
+                  <Component {...pageProps} />
+                </main>
+                <Footer />
+                <Scroller />
+              </div>
+            </DemoProvider>
+          </AppWalletProvider>
+        </AuthProvider>
+      </MeshProvider>
+    </SessionContextProvider>
   );
 }
 

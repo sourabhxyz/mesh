@@ -11,3 +11,7 @@ export type Recipient = {
 //   onchain?: { onchain_metadata: { image: string } };
 //   image?: string;
 // };
+
+export type User = {
+  address: string;
+};

@@ -193,6 +193,8 @@ function Display() {
 
   const html = Markdoc.renderers.html(content);
 
+  function commitToWork() {}
+
   return (
     <div className="grid grid-flow-row-dense grid-cols-2 place-content-start gap-8">
       <div>
@@ -210,6 +212,8 @@ function Display() {
             dangerouslySetInnerHTML={{ __html: html }}
           />
         </div>
+
+        <Button onClick={() => commitToWork()}>Commit to work on this</Button>
       </div>
       <Activity />
     </div>

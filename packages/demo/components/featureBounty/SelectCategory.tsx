@@ -20,15 +20,15 @@ export default function SelectCategory() {
 function Item({ title, description }) {
   return (
     <Link href={`/feature-bounty/list/transaction`}>
-      <div className="flex justify-center items-center p-6 text-center bg-gray-100 rounded dark:bg-gray-800">
-      <article className="max-w-xs cursor-pointer">
-        <h2 className="mb-2 text-xl font-bold leading-tight text-gray-900 dark:text-white">
-          {title}
-        </h2>
-        <p className="mb-4 font-light text-gray-500 dark:text-gray-400">
-          {description}
-        </p>
-      </article>
+      <div className="block max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow-md hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700 cursor-pointer">
+        <article className="max-w-xs">
+          <h2 className="mb-2 text-xl font-bold leading-tight text-gray-900 dark:text-white">
+            {title}
+          </h2>
+          <p className="mb-4 font-light text-gray-500 dark:text-gray-400">
+            {description}
+          </p>
+        </article>
       </div>
     </Link>
   );
