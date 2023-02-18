@@ -1,21 +1,16 @@
-import { csl } from '@mesh/core';
+import * as tsl from '@harmoniclabs/plu-ts';
 import {
   DEFAULT_PROTOCOL_PARAMETERS, POLICY_ID_LENGTH, SUPPORTED_WALLETS,
 } from '@mesh/common/constants';
-import { IInitiator, ISigner, ISubmitter } from '@mesh/common/contracts';
-import { mergeSignatures } from '@mesh/common/helpers';
+import { ISigner, ISubmitter } from '@mesh/common/contracts';
 import {
-  deserializeAddress, deserializeTx, deserializeTxWitnessSet,
-  deserializeTxUnspentOutput, deserializeValue, fromBytes,
-  fromTxUnspentOutput, fromUTF8, fromValue, resolveFingerprint,
-  toAddress, toUTF8,
+  fromUTF8, resolveFingerprint, toUTF8,
 } from '@mesh/common/utils';
-import type { Address, TransactionUnspentOutput } from '@mesh/core';
 import type {
   Asset, AssetExtended, DataSignature, UTxO, Wallet,
 } from '@mesh/common/types';
 
-export class BrowserWallet implements IInitiator, ISigner, ISubmitter {
+export class BrowserWallet implements ISigner, ISubmitter {
   private constructor(private readonly _walletInstance: WalletInstance) {}
 
   static getInstalledWallets(): Wallet[] {
@@ -45,12 +40,12 @@ export class BrowserWallet implements IInitiator, ISigner, ISubmitter {
 
   async getBalance(): Promise<Asset[]> {
     const balance = await this._walletInstance.getBalance();
-    return fromValue(deserializeValue(balance));
+    return fromValue(tsl.Value.fromCbor(balance));
   }
 
   async getChangeAddress(): Promise<string> {
     const changeAddress = await this._walletInstance.getChangeAddress();
-    return deserializeAddress(changeAddress).to_bech32();
+    return tsl.Address.fromCbor(changeAddress).toString();
   }
 
   async getCollateral(
@@ -66,17 +61,17 @@ export class BrowserWallet implements IInitiator, ISigner, ISubmitter {
 
   async getRewardAddresses(): Promise<string[]> {
     const rewardAddresses = await this._walletInstance.getRewardAddresses();
-    return rewardAddresses.map((ra) => deserializeAddress(ra).to_bech32());
+    return rewardAddresses.map((ra) => tsl.Address.fromCbor(ra).toString());
   }
 
   async getUnusedAddresses(): Promise<string[]> {
     const unusedAddresses = await this._walletInstance.getUnusedAddresses();
-    return unusedAddresses.map((una) => deserializeAddress(una).to_bech32());
+    return unusedAddresses.map((una) => tsl.Address.fromCbor(una).toString());
   }
 
   async getUsedAddresses(): Promise<string[]> {
     const usedAddresses = await this._walletInstance.getUsedAddresses();
-    return usedAddresses.map((usa) => deserializeAddress(usa).to_bech32());
+    return usedAddresses.map((usa) => tsl.Address.fromCbor(usa).toString());
   }
 
   async getUtxos(): Promise<UTxO[]> {
@@ -85,35 +80,28 @@ export class BrowserWallet implements IInitiator, ISigner, ISubmitter {
   }
 
   signData(address: string, payload: string): Promise<DataSignature> {
-    const signerAddress = toAddress(address).to_hex();
+    const signerAddress = tsl.Address.fromString(address).toCbor().toString();
     return this._walletInstance.signData(signerAddress, fromUTF8(payload));
   }
 
   async signTx(unsignedTx: string, partialSign = false): Promise<string> {
     try {
-      const tx = deserializeTx(unsignedTx);
-      const txWitnessSet = tx.witness_set();
+      const tx = tsl.Tx.fromCbor(unsignedTx);
 
       const newWitnessSet = await this._walletInstance
         .signTx(unsignedTx, partialSign);
 
-      const newSignatures = deserializeTxWitnessSet(newWitnessSet)
-        .vkeys() ?? csl.Vkeywitnesses.new();
+      const newSignatures = tsl.TxWitnessSet.fromCbor(newWitnessSet)
+        .vkeyWitnesses ?? [];
 
-      const txSignatures = mergeSignatures(
-        txWitnessSet,
+      const txWitnessSet = mergeSignatures(
+        tx.witnesses,
         newSignatures,
       );
 
-      txWitnessSet.set_vkeys(txSignatures);
-
-      const signedTx = fromBytes(
-        csl.Transaction.new(
-          tx.body(),
-          txWitnessSet,
-          tx.auxiliary_data()
-        ).to_bytes()
-      );
+      const signedTx = new tsl.Tx({
+        ...tx, witnesses: txWitnessSet,
+      }).toCbor().toString();
 
       return signedTx;
     } catch (error) {
@@ -125,21 +113,21 @@ export class BrowserWallet implements IInitiator, ISigner, ISubmitter {
     return this._walletInstance.submitTx(tx);
   }
 
-  async getUsedAddress(): Promise<Address> {
+  async getUsedAddress(): Promise<tsl.Address> {
     const usedAddresses = await this._walletInstance.getUsedAddresses();
-    return deserializeAddress(usedAddresses[0]);
+    return tsl.Address.fromCbor(usedAddresses[0]);
   }
 
   async getUsedCollateral(
     limit = DEFAULT_PROTOCOL_PARAMETERS.maxCollateralInputs,
-  ): Promise<TransactionUnspentOutput[]> {
+  ): Promise<tsl.UTxO[]> {
     const collateral = (await this._walletInstance.experimental.getCollateral()) ?? [];
-    return collateral.map((c) => deserializeTxUnspentOutput(c)).slice(0, limit);
+    return collateral.map((c) => tsl.UTxO.fromCbor(c)).slice(0, limit);
   }
 
-  async getUsedUTxOs(): Promise<TransactionUnspentOutput[]> {
+  async getUsedUTxOs(): Promise<tsl.UTxO[]> {
     const utxos = (await this._walletInstance.getUtxos()) ?? [];
-    return utxos.map((u) => deserializeTxUnspentOutput(u));
+    return utxos.map((u) => tsl.UTxO.fromCbor(u));
   }
 
   async getAssets(): Promise<AssetExtended[]> {
@@ -225,3 +213,66 @@ type WalletInstance = {
 type ExperimentalFeatures = {
   getCollateral(): Promise<string[] | undefined>;
 };
+
+function fromValue(value: tsl.Value): Asset[] {
+  return value.map.flatMap(({ policy, assets }) => {
+    return policy === ''
+      ? { unit: 'lovelace', quantity: assets[''].toString() }
+      : Object.keys(assets).map((assetName) => ({
+          unit: `${policy.toString()}${fromUTF8(assetName)}`,
+          quantity: assets[assetName].toString()
+        }));
+  });
+}
+
+function fromTxUnspentOutput(utxo: tsl.UTxO): UTxO {
+  const dataHash = tsl.isData(utxo.resolved.datum)
+    ? tsl.hashData(utxo.resolved.datum)
+    : utxo.resolved.datum?.toString();
+
+  const plutusData = tsl.isData(utxo.resolved.datum)
+    ? tsl.dataToCbor(utxo.resolved.datum).toString()
+    : undefined;
+
+  const scriptRef = utxo.resolved.refScript?.toCbor().toString();
+
+  return <UTxO>{
+    input: {
+      outputIndex: utxo.utxoRef.index,
+      txHash: utxo.utxoRef.id.toString(),
+    },
+    output: {
+      address: utxo.resolved.address.toString(),
+      amount: fromValue(utxo.resolved.value),
+      dataHash, plutusData, scriptRef,
+    },
+  };
+}
+
+function mergeSignatures(txWitnessSet: tsl.TxWitnessSet, newSignatures: tsl.VKeyWitness[]) {
+  const txSignatures = txWitnessSet.vkeyWitnesses;
+
+  if (txSignatures !== undefined) {
+    const signatures = new Set<string>();
+
+    txSignatures.forEach((signature) => {
+      signatures.add(signature.toCbor().toString());
+    });
+
+    newSignatures.forEach((signature) => {
+      signatures.add(signature.toCbor().toString());
+    });
+
+    return new tsl.TxWitnessSet({
+      ...txWitnessSet,
+      vkeyWitnesses: [...signatures].map(
+        (signature) => tsl.VKeyWitness.fromCbor(signature)
+      )
+    });
+  }
+
+  return new tsl.TxWitnessSet({
+    ...txWitnessSet,
+    vkeyWitnesses: newSignatures
+  });
+}
