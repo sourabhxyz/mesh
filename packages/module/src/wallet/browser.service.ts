@@ -4,7 +4,7 @@ import {
 } from '@mesh/common/constants';
 import { ISigner, ISubmitter } from '@mesh/common/contracts';
 import {
-  fromUTF8, resolveFingerprint, toUTF8,
+  fromBytes, fromUTF8, resolveFingerprint, toUTF8,
 } from '@mesh/common/utils';
 import type {
   Asset, AssetExtended, DataSignature, UTxO, Wallet,
@@ -45,7 +45,7 @@ export class BrowserWallet implements ISigner, ISubmitter {
 
   async getChangeAddress(): Promise<string> {
     const changeAddress = await this._walletInstance.getChangeAddress();
-    return tsl.Address.fromCbor(changeAddress).toString();
+    return tsl.Address.fromBytes(changeAddress).toString();
   }
 
   async getCollateral(
@@ -61,17 +61,20 @@ export class BrowserWallet implements ISigner, ISubmitter {
 
   async getRewardAddresses(): Promise<string[]> {
     const rewardAddresses = await this._walletInstance.getRewardAddresses();
-    return rewardAddresses.map((ra) => tsl.Address.fromCbor(ra).toString());
+    console.log(rewardAddresses);
+    return rewardAddresses.map((ra) => tsl.StakeAddress.fromBytes(
+      ra.length === 29 * 2 ? ra.slice(2) : ra
+    ).toString());
   }
 
   async getUnusedAddresses(): Promise<string[]> {
     const unusedAddresses = await this._walletInstance.getUnusedAddresses();
-    return unusedAddresses.map((una) => tsl.Address.fromCbor(una).toString());
+    return unusedAddresses.map((una) => tsl.Address.fromBytes(una).toString());
   }
 
   async getUsedAddresses(): Promise<string[]> {
     const usedAddresses = await this._walletInstance.getUsedAddresses();
-    return usedAddresses.map((usa) => tsl.Address.fromCbor(usa).toString());
+    return usedAddresses.map((usa) => tsl.Address.fromBytes(usa).toString());
   }
 
   async getUtxos(): Promise<UTxO[]> {
@@ -115,7 +118,7 @@ export class BrowserWallet implements ISigner, ISubmitter {
 
   async getUsedAddress(): Promise<tsl.Address> {
     const usedAddresses = await this._walletInstance.getUsedAddresses();
-    return tsl.Address.fromCbor(usedAddresses[0]);
+    return tsl.Address.fromBytes(usedAddresses[0]);
   }
 
   async getUsedCollateral(
@@ -227,7 +230,7 @@ function fromValue(value: tsl.Value): Asset[] {
 
 function fromTxUnspentOutput(utxo: tsl.UTxO): UTxO {
   const dataHash = tsl.isData(utxo.resolved.datum)
-    ? tsl.hashData(utxo.resolved.datum)
+    ? fromBytes(tsl.hashData(utxo.resolved.datum).toBytes())
     : utxo.resolved.datum?.toString();
 
   const plutusData = tsl.isData(utxo.resolved.datum)
