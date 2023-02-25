@@ -90,6 +90,17 @@ export class BrowserWallet implements ISigner, ISubmitter {
     return tsl.Address.fromBytes(changeAddress).toString();
   }
 
+  /**
+   * This function shall return a list of one or more UTXOs (unspent transaction outputs) controlled by the wallet that are required to reach AT LEAST the combined ADA value target specified in amount AND the best suitable to be used as collateral inputs for transactions with plutus script inputs (pure ADA-only utxos).
+   * If this cannot be attained, an error message with an explanation of the blocking problem shall be returned. NOTE: wallets are free to return utxos that add up to a greater total ADA value than requested in the amount parameter, but wallets must never return any result where utxos would sum up to a smaller total ADA value, instead in a case like that an error message must be returned.
+   * @param limit - The maximum number of collateral inputs to return.
+   * @returns {Promise<UTxO[]>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getCollateral}
+   * @example
+   * ```typescript
+   * const collateral = await wallet.getCollateral();
+   * ```
+   */
   async getCollateral(
     limit = DEFAULT_PROTOCOL_PARAMETERS.maxCollateralInputs,
   ): Promise<UTxO[]> {
@@ -97,38 +108,108 @@ export class BrowserWallet implements ISigner, ISubmitter {
     return deserializedCollateral.map((dc) => fromTxUnspentOutput(dc));
   }
 
+  /**
+   * Returns the network ID of the currently connected account. 
+   * `0` is testnet and `1` is mainnet but other networks can possibly be returned by wallets. Those other network ID values are not governed by CIP-30. This result will stay the same unless the connected account has changed.
+   * @returns {Promise<number>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getNetworkId}
+   * @example
+   * ```typescript
+   * const networkId = await wallet.getNetworkId();
+   * ```
+   */
   getNetworkId(): Promise<number> {
     return this._walletInstance.getNetworkId();
   }
 
+  /**
+   * Returns a list of reward addresses owned by the wallet.
+   * A reward address is a stake address that is used to receive rewards from staking, generally starts from `stake` prefix.
+   * @returns {Promise<string[]>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getRewardAddresses}
+   * @example
+   * ```typescript
+   * const rewardAddresses = await wallet.getRewardAddresses();
+   * ```
+   */
   async getRewardAddresses(): Promise<string[]> {
     const rewardAddresses = await this._walletInstance.getRewardAddresses();
-    console.log(rewardAddresses);
     return rewardAddresses.map((ra) => tsl.StakeAddress.fromBytes(
       ra.length === 29 * 2 ? ra.slice(2) : ra
     ).toString());
   }
 
+  /**
+   * Returns a list of unused addresses controlled by the wallet.
+   * @returns {Promise<string[]>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getUnusedAddresses}
+   * @example
+   * ```typescript
+   * const usedAddresses = await wallet.getUnusedAddresses();
+   * ```
+   */
   async getUnusedAddresses(): Promise<string[]> {
     const unusedAddresses = await this._walletInstance.getUnusedAddresses();
     return unusedAddresses.map((una) => tsl.Address.fromBytes(una).toString());
   }
 
+  /**
+   * Returns a list of used addresses controlled by the wallet.
+   * @returns {Promise<string[]>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getUsedAddresses}
+   * @example
+   * ```typescript
+   * const usedAddresses = await wallet.getUsedAddresses();
+   * ```
+   */
   async getUsedAddresses(): Promise<string[]> {
     const usedAddresses = await this._walletInstance.getUsedAddresses();
     return usedAddresses.map((usa) => tsl.Address.fromBytes(usa).toString());
   }
 
+  /**
+   * Return a list of all UTXOs (unspent transaction outputs) controlled by the wallet. ADA balance and multiasset value in each UTXO are specified in amount.
+   * @returns {Promise<UTxO[]>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getUtxos}
+   * @example
+   * ```typescript
+   * const utxos = await wallet.getUtxos();
+   * ```
+   */
   async getUtxos(): Promise<UTxO[]> {
     const deserializedUTxOs = await this.getUsedUTxOs();
     return deserializedUTxOs.map((du) => fromTxUnspentOutput(du));
   }
 
+  /**
+   * This endpoint utilizes the CIP-8 to sign arbitrary data, to verify the data was signed by the owner of the private key.
+   * @param {string} address Get address from getUsedAddresses() or getRewardAddresses() endpoint
+   * @param payload Data to be signed
+   * @returns {Promise<DataSignature>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#signData}
+   * @example
+   * ```typescript
+   * const addresses = await wallet.getUsedAddresses();
+   * const signature = await wallet.signData(addresses[0], 'mesh');
+   * ```
+   */
   signData(address: string, payload: string): Promise<DataSignature> {
     const signerAddress = tsl.Address.fromString(address).toCbor().toString();
     return this._walletInstance.signData(signerAddress, fromUTF8(payload));
   }
 
+  /**
+   * Requests user to sign the provided transaction. The wallet should ask the user for permission, and if given, try to sign the supplied body and return a signed transaction. partialSign should be true if the transaction provided requires multiple signatures.
+   * @param {Transaction} unsignedTx The Transaction object to be signed
+   * @param {boolean} partialSign Must be true if the transaction provided requires multiple signatures.
+   * @returns {Promise<Transaction>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#signTx}
+   * @example
+   * ```typescript
+   * const tx = new Transaction({ initiator: wallet });
+   * const unsignedTx = await tx.build();
+   * const signedTx = await wallet.signTx(unsignedTx, false);
+   */
   async signTx(unsignedTx: string, partialSign = false): Promise<string> {
     try {
       const tx = tsl.Tx.fromCbor(unsignedTx);
@@ -154,6 +235,19 @@ export class BrowserWallet implements ISigner, ISubmitter {
     }
   }
 
+  /**
+   * As wallets should already have this ability to submit transaction, we allow dApps to request that a transaction be sent through it. If the wallet accepts the transaction and tries to send it, it shall return the transaction ID for the dApp to track. The wallet can return error messages or failure if there was an error in sending it.
+   * @param {Transaction} tx The Transaction object to be submitted
+   * @returns {Promise<string>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#submitTx}
+   * @example
+   * ```typescript
+   * const tx = new Transaction({ initiator: wallet });
+   * const unsignedTx = await tx.build();
+   * const signedTx = await wallet.signTx(unsignedTx, false);
+   * const txId = await wallet.submitTx(signedTx);
+   * ```
+   */
   submitTx(tx: string): Promise<string> {
     return this._walletInstance.submitTx(tx);
   }
@@ -175,6 +269,15 @@ export class BrowserWallet implements ISigner, ISubmitter {
     return utxos.map((u) => tsl.UTxO.fromCbor(u));
   }
 
+  /**
+   * Returns a list of assets in wallet excluding lovelace.
+   * @returns {Promise<AssetExtended[]>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getAssets}
+   * @example
+   * ```typescript
+   * const assets = await wallet.getAssets();
+   * ```
+   */
   async getAssets(): Promise<AssetExtended[]> {
     const balance = await this.getBalance();
     return balance
@@ -194,6 +297,15 @@ export class BrowserWallet implements ISigner, ISubmitter {
       });
   }
 
+  /**
+   * Return the lovelace balance in wallet. 1 ADA = 1000000 lovelace.
+   * @returns {Promise<string>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getLovelace}
+   * @example
+   * ```typescript
+   * const lovelace = await wallet.getLovelace();
+   * ```
+   */
   async getLovelace(): Promise<string> {
     const balance = await this.getBalance();
     const nativeAsset = balance.find((v) => v.unit === 'lovelace');
@@ -201,11 +313,30 @@ export class BrowserWallet implements ISigner, ISubmitter {
     return nativeAsset !== undefined ? nativeAsset.quantity : '0';
   }
 
+  /**
+   * Returns a list of assets from a policy ID. If no assets in wallet belongs to the policy ID, an empty list is returned. Query for a list of assets' policy ID with wallet.getPolicyIds().
+   * @param {string} policyId The policy ID of the assets to be returned.
+   * @returns {Promise<AssetExtended[]>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getPolicyIdAssets}
+   * @example
+   * ```typescript
+   * const assets = await wallet.getPolicyIdAssets('64af286e2ad0df4de2e7de15f8ff5b3d27faecf4ab2757056d860a42');
+   * ```
+   */
   async getPolicyIdAssets(policyId: string): Promise<AssetExtended[]> {
     const assets = await this.getAssets();
     return assets.filter((v) => v.policyId === policyId);
   }
 
+  /**
+   * Return a list of assets' policy ID.
+   * @returns {Promise<string[]>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getPolicyIds}
+   * @example
+   * ```typescript
+   * const policyIds = await wallet.getPolicyIds();
+   * ```
+   */
   async getPolicyIds(): Promise<string[]> {
     const balance = await this.getBalance();
     return Array.from(
