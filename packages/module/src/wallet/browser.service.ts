@@ -13,6 +13,19 @@ import type {
 export class BrowserWallet implements ISigner, ISubmitter {
   private constructor(private readonly _walletInstance: WalletInstance) {}
 
+  /**
+   * Returns a list of wallets installed on user's device.
+   * Each wallet is represented by an object with the following properties:
+   * * A name is provided to display wallet's name on the user interface.
+   * * A version is provided to display wallet's version on the user interface.
+   * * An icon is provided to display wallet's icon on the user interface.
+   * @returns {Wallet[]}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getInstallWallets}
+   * @example
+   * ```typescript
+   * const wallets = BrowserWallet.getInstalledWallets();
+   * ```
+  */
   static getInstalledWallets(): Wallet[] {
     if (window.cardano === undefined) return [];
 
@@ -25,6 +38,17 @@ export class BrowserWallet implements ISigner, ISubmitter {
       }));
   }
 
+  /**
+   * This is the entrypoint to start communication with the user's wallet. 
+   * The wallet should request the user's permission to connect the web page to the user's wallet, and if permission has been granted, the wallet will be returned and exposing the full API for the dApp to use.
+   * @param walletName
+   * @returns {Promise<BrowserWallet>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#connectWallet}
+   * @example
+   * ```typescript
+   * const wallet = await BrowserWallet.enable('eternl');
+   * ```
+   */
   static async enable(walletName: string): Promise<BrowserWallet> {    
     try {
       const walletInstance = await BrowserWallet.resolveInstance(walletName);
@@ -38,11 +62,29 @@ export class BrowserWallet implements ISigner, ISubmitter {
     }
   }
 
+  /**
+   * Returns a list of assets in the wallet.
+   * @returns {Promise<Asset[]>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getBalance}
+   * @example
+   * ```typescript
+   * const balance = await wallet.getBalance();
+   * ```
+   */
   async getBalance(): Promise<Asset[]> {
     const balance = await this._walletInstance.getBalance();
     return fromValue(tsl.Value.fromCbor(balance));
   }
 
+  /**
+   * Returns an address owned by the wallet that should be used as a change address to return leftover assets during transaction creation back to the connected wallet.
+   * @returns {Promise<string>}
+   * @see {@link https://meshjs.dev/apis/browserwallet#getChangeAddress}
+   * @example
+   * ```typescript
+   * const changeAddress = await wallet.getChangeAddress();
+   * ```
+   */
   async getChangeAddress(): Promise<string> {
     const changeAddress = await this._walletInstance.getChangeAddress();
     return tsl.Address.fromBytes(changeAddress).toString();
