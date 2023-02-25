@@ -168,7 +168,7 @@ export class BrowserWallet implements ISigner, ISubmitter {
   }
 
   /**
-   * Return a list of all UTXOs (unspent transaction outputs) controlled by the wallet. ADA balance and multiasset value in each UTXO are specified in amount.
+   * Return a list of all UTXOs (unspent transaction outputs) controlled by the wallet.
    * @returns {Promise<UTxO[]>}
    * @see {@link https://meshjs.dev/apis/browserwallet#getUtxos}
    * @example
