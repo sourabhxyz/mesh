@@ -199,9 +199,9 @@ export class BrowserWallet implements ISigner, ISubmitter {
   }
 
   /**
-   * Requests user to sign the provided transaction. The wallet should ask the user for permission, and if given, try to sign the supplied body and return a signed transaction. partialSign should be true if the transaction provided requires multiple signatures.
+   * Requests user to sign the provided transaction. The wallet should ask the user for permission, and if given, try to sign the supplied body and return a signed transaction. `partialSign` should be `true` if the transaction provided requires multiple signatures.
    * @param {Transaction} unsignedTx The Transaction object to be signed
-   * @param {boolean} partialSign Must be true if the transaction provided requires multiple signatures.
+   * @param {boolean} partialSign Must be true if the transaction provided requires multiple signatures. The default value is `false`.
    * @returns {Promise<Transaction>}
    * @see {@link https://meshjs.dev/apis/browserwallet#signTx}
    * @example
@@ -245,7 +245,7 @@ export class BrowserWallet implements ISigner, ISubmitter {
    * const tx = new Transaction({ initiator: wallet });
    * const unsignedTx = await tx.build();
    * const signedTx = await wallet.signTx(unsignedTx, false);
-   * const txId = await wallet.submitTx(signedTx);
+   * const txHash = await wallet.submitTx(signedTx);
    * ```
    */
   submitTx(tx: string): Promise<string> {

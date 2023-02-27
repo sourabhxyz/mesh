@@ -66,12 +66,30 @@ export class AppWallet implements IInitiator, ISigner, ISubmitter {
     }
   }
 
+  /**
+   * Get wallet's address. For multi-addresses wallet, it will return the first address. To choose other address, `accountIndex` can be specified.
+   * @param {number} accountIndex The index of the account to get address from. The default value is `0`.
+   * @returns {string} The address of the wallet.
+   * @example
+   * ```typescript
+   * const address = wallet.getPaymentAddress();
+   * ```
+   */
   getPaymentAddress(accountIndex = 0): string {
     const account = this._wallet
       .getAccount(accountIndex, DEFAULT_PASSWORD);
     return account.enterpriseAddress;
   }
 
+  /**
+   * Get wallet's reward address. For multi-addresses wallet, it will return the first address. To choose other address, `accountIndex` can be specified.
+   * @param {number} accountIndex The index of the account to get address from. The default value is `0`.
+   * @returns {string} The reward address of the wallet.
+   * @example
+   * ```typescript
+   * const address = wallet.getRewardAddress();
+   * ```
+   */
   getRewardAddress(accountIndex = 0): string {
     const account = this._wallet
       .getAccount(accountIndex, DEFAULT_PASSWORD);
@@ -99,6 +117,14 @@ export class AppWallet implements IInitiator, ISigner, ISubmitter {
     return utxos.map((utxo) => toTxUnspentOutput(utxo));
   }
 
+  /**
+   * Sign arbitrary data to verify the data was signed by the owner of the private key.
+   * @param {string} address The address to sign the data with.
+   * @param {string} payload The data to sign.
+   * @param accountIndex The index of the account to sign the data with. The default value is `0`.
+   * @returns {DataSignature} The signature of the data.
+   * @see {@link https://meshjs.dev/apis/appwallet#signData}
+   */
   signData(address: string, payload: string, accountIndex = 0): DataSignature {
     try {
       return this._wallet.signData(accountIndex, DEFAULT_PASSWORD, address, payload);
@@ -107,6 +133,19 @@ export class AppWallet implements IInitiator, ISigner, ISubmitter {
     }
   }
 
+  /**
+   * Requests user to sign the supplied transaction and return a signed transaction. `partialSign` should be `true` if the transaction provided requires multiple signatures.
+   * @param {string} unsignedTx The unsigned transaction to sign.
+   * @param {boolean} partialSign Whether the transaction requires multiple signatures. The default value is `false`.
+   * @param {number} accountIndex The index of the account to sign the transaction with. The default value is `0`.
+   * @returns {Promise<string>} The signed transaction.
+   * @see {@link https://meshjs.dev/apis/appwallet#signTx}
+   * @example
+   * ```typescript
+   * const tx = new Transaction({ initiator: wallet });
+   * const unsignedTx = await tx.build();
+   * const signedTx = await wallet.signTx(unsignedTx, false);
+   */
   async signTx(
     unsignedTx: string, partialSign = false, accountIndex = 0,
   ): Promise<string> {
@@ -143,10 +182,33 @@ export class AppWallet implements IInitiator, ISigner, ISubmitter {
     }
   }
 
+  /**
+   * Submit a signed transaction to the blockchain.
+   * @param {string} tx The signed transaction to submit.
+   * @returns {Promise<string>} The transaction hash.
+   * @example
+   * ```typescript
+   * const tx = new Transaction({ initiator: wallet });
+   * const unsignedTx = await tx.build();
+   * const signedTx = await wallet.signTx(unsignedTx);
+   * const txHash = await wallet.submitTx(signedTx);
+   * ```
+   */
   submitTx(tx: string): Promise<string> {
     return this._submitter.submitTx(tx);
   }
 
+  /**
+   * You can generate deterministic keys based on the Bitcoin BIP39. These mnemonic phrases allow you to recover your wallet.
+   * @param {number} strength The strength of the mnemonic phrase. The default is 256.
+   * @returns {string[]} The mnemonic phrase.
+   * @see {@link https://meshjs.dev/apis/appwallet#generateWallet}
+   * @example
+   * ```typescript
+   * import { AppWallet } from '@meshsdk/core';
+   * const mnemonic = AppWallet.brew();
+   * ```
+   */
   static brew(strength = 256): string[] {
     return EmbeddedWallet.generateMnemonic(strength);
   }
