@@ -10,6 +10,11 @@ import type {
   Asset, AssetExtended, DataSignature, UTxO, Wallet,
 } from '@mesh/common/types';
 
+/**
+ * Wallet for connecting, queries and performs wallet functions in accordance to CIP-30.
+ * These wallets APIs are in accordance to CIP-30, which defines the API for dApps to communicate with the user's wallet. Additional utility functions provided for developers that are useful for building dApps.
+ * @see {@link https://meshjs.dev/apis/browserwallet}
+ */
 export class BrowserWallet implements ISigner, ISubmitter {
   private constructor(private readonly _walletInstance: WalletInstance) {}
 

@@ -30,6 +30,11 @@ export type CreateAppWalletOptions = {
   };
 };
 
+/**
+ * Wallet for building transactions in your applications.
+ * Whether you are building a minting script, or an application that requires multi-signature, AppWallet is all you need to get started.
+ * @see {@link https://meshjs.dev/apis/appwallet}
+ */
 export class AppWallet implements IInitiator, ISigner, ISubmitter {
   private readonly _fetcher: IFetcher;
   private readonly _submitter: ISubmitter;

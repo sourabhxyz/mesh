@@ -22,6 +22,10 @@ import type {
   PlutusScript, PoolParams, Quantity, Recipient, Token, Unit, UTxO,
 } from '@mesh/common/types';
 
+/**
+ * Create transactions for sending assets, interact with smart contracts, minting and burning native assets, staking ADA and managing stake pools.
+ * @see {@link https://meshjs.dev/apis/transaction}
+ */
 @Trackable
 export class Transaction {
   private _changeAddress?: Address;
