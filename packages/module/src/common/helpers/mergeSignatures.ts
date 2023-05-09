@@ -1,31 +1,31 @@
-import { csl } from '@mesh/core';
-import type {
-  TransactionWitnessSet, Vkeywitnesses,
-} from '@mesh/core';
+import { TxWitnessSet, VKeyWitness } from '@harmoniclabs/plu-ts';
 
 export const mergeSignatures = (
-  txWitnessSet: TransactionWitnessSet, newSignatures: Vkeywitnesses,
+  txWitnessSet: TxWitnessSet, newSignatures: VKeyWitness[],
 ) => {
-  const txSignatures = txWitnessSet.vkeys();
+  const txSignatures = txWitnessSet.vkeyWitnesses;
 
   if (txSignatures !== undefined) {
     const signatures = new Set<string>();
 
-    for (let index = 0; index < txSignatures.len(); index += 1) {
-      signatures.add(txSignatures.get(index).to_hex());
-    }
-
-    for (let index = 0; index < newSignatures.len(); index += 1) {
-      signatures.add(newSignatures.get(index).to_hex());
-    }
-
-    const allSignatures = csl.Vkeywitnesses.new();
-    signatures.forEach((witness) => {
-      allSignatures.add(csl.Vkeywitness.from_hex(witness));
+    txSignatures.forEach((signature) => {
+      signatures.add(signature.toCbor().toString());
     });
 
-    return allSignatures;
+    newSignatures.forEach((signature) => {
+      signatures.add(signature.toCbor().toString());
+    });
+
+    return new TxWitnessSet({
+      ...txWitnessSet,
+      vkeyWitnesses: [...signatures].map(
+        (signature) => VKeyWitness.fromCbor(signature)
+      )
+    });
   }
 
-  return newSignatures;
+  return new TxWitnessSet({
+    ...txWitnessSet,
+    vkeyWitnesses: newSignatures
+  });
 };
