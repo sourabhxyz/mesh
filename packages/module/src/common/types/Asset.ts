@@ -1,8 +1,14 @@
+import { Value } from '@harmoniclabs/plu-ts';
+
+export type Unit = string;
+
+export type Quantity = bigint;
+
 export type Asset = {
   unit: Unit;
   quantity: Quantity;
 };
 
-export type Unit = string;
+export const fromValue = (value: Value): Asset[] => value.toUnits();
 
-export type Quantity = string;
+export const toValue = (assets: Asset[]): Value => Value.fromUnits(assets);
