@@ -1,22 +1,26 @@
-import * as tsl from '@harmoniclabs/plu-ts';
 import {
-  DEFAULT_PROTOCOL_PARAMETERS, POLICY_ID_LENGTH, SUPPORTED_WALLETS,
+  Address, StakeAddress, Tx, TxWitnessSet, UTxO as TxUnspentOutput,
+} from '@harmoniclabs/plu-ts';
+import {
+  SUPPORTED_WALLETS, DEFAULT_PROTOCOL_PARAMETERS, POLICY_ID_LENGTH,
 } from '@mesh/common/constants';
-import { ISigner, ISubmitter } from '@mesh/common/contracts';
+import { ICreator, ISigner, ISubmitter } from '@mesh/common/contracts';
+import { mergeSignatures } from '@mesh/common/helpers';
+import { fromUTF8, resolveFingerprint, toUTF8 } from '@mesh/common/utils';
+import { Cardano, WalletStandard } from '@mesh/core';
 import {
-  fromBytes, fromUTF8, resolveFingerprint, toUTF8,
-} from '@mesh/common/utils';
-import type {
-  Asset, AssetExtended, DataSignature, UTxO, Wallet,
+  Asset, AssetExtended, DataSignature, fromValue,
+  fromTxUnspentOutput, toTxUnspentOutput, UTxO, Wallet,
 } from '@mesh/common/types';
 
 /**
  * Wallet for connecting, queries and performs wallet functions in accordance to CIP-30.
- * These wallets APIs are in accordance to CIP-30, which defines the API for dApps to communicate with the user's wallet. Additional utility functions provided for developers that are useful for building dApps.
+ * These wallets APIs are in accordance to CIP-30, which defines the API for dApps to communicate with the user's wallet.
+ * Additional utility functions provided for developers that are useful for building dApps.
  * @see {@link https://meshjs.dev/apis/browserwallet}
  */
-export class BrowserWallet implements ISigner, ISubmitter {
-  private constructor(private readonly _walletInstance: WalletInstance) {}
+export class BrowserWallet implements ICreator, ISigner, ISubmitter {
+  private constructor(private readonly _walletInstance: WalletStandard) {}
 
   /**
    * Returns a list of wallets installed on user's device.
@@ -45,7 +49,8 @@ export class BrowserWallet implements ISigner, ISubmitter {
 
   /**
    * This is the entrypoint to start communication with the user's wallet. 
-   * The wallet should request the user's permission to connect the web page to the user's wallet, and if permission has been granted, the wallet will be returned and exposing the full API for the dApp to use.
+   * The wallet should request the user's permission to connect the web page to the user's wallet.
+   * If permission has been granted, the wallet will be returned and exposing the full API for the dApp to use.
    * @param walletName
    * @returns {Promise<BrowserWallet>}
    * @see {@link https://meshjs.dev/apis/browserwallet#connectWallet}
@@ -78,7 +83,7 @@ export class BrowserWallet implements ISigner, ISubmitter {
    */
   async getBalance(): Promise<Asset[]> {
     const balance = await this._walletInstance.getBalance();
-    return fromValue(tsl.Value.fromCbor(balance));
+    return fromValue(balance);
   }
 
   /**
@@ -92,7 +97,7 @@ export class BrowserWallet implements ISigner, ISubmitter {
    */
   async getChangeAddress(): Promise<string> {
     const changeAddress = await this._walletInstance.getChangeAddress();
-    return tsl.Address.fromBytes(changeAddress).toString();
+    return Address.fromBytes(changeAddress).toString();
   }
 
   /**
@@ -109,8 +114,8 @@ export class BrowserWallet implements ISigner, ISubmitter {
   async getCollateral(
     limit = DEFAULT_PROTOCOL_PARAMETERS.maxCollateralInputs,
   ): Promise<UTxO[]> {
-    const deserializedCollateral = await this.getUsedCollateral(limit);
-    return deserializedCollateral.map((dc) => fromTxUnspentOutput(dc));
+    const collateral = (await this._walletInstance.experimental.getCollateral()) ?? [];
+    return collateral.map((c) => fromTxUnspentOutput(c)).slice(0, limit);
   }
 
   /**
@@ -139,9 +144,7 @@ export class BrowserWallet implements ISigner, ISubmitter {
    */
   async getRewardAddresses(): Promise<string[]> {
     const rewardAddresses = await this._walletInstance.getRewardAddresses();
-    return rewardAddresses.map((ra) => tsl.StakeAddress.fromBytes(
-      ra.length === 29 * 2 ? ra.slice(2) : ra
-    ).toString());
+    return rewardAddresses.map((r) => StakeAddress.fromBytes(r).toString());
   }
 
   /**
@@ -155,7 +158,7 @@ export class BrowserWallet implements ISigner, ISubmitter {
    */
   async getUnusedAddresses(): Promise<string[]> {
     const unusedAddresses = await this._walletInstance.getUnusedAddresses();
-    return unusedAddresses.map((una) => tsl.Address.fromBytes(una).toString());
+    return unusedAddresses.map((una) => Address.fromBytes(una).toString());
   }
 
   /**
@@ -169,7 +172,7 @@ export class BrowserWallet implements ISigner, ISubmitter {
    */
   async getUsedAddresses(): Promise<string[]> {
     const usedAddresses = await this._walletInstance.getUsedAddresses();
-    return usedAddresses.map((usa) => tsl.Address.fromBytes(usa).toString());
+    return usedAddresses.map((usa) => Address.fromBytes(usa).toString());
   }
 
   /**
@@ -182,8 +185,8 @@ export class BrowserWallet implements ISigner, ISubmitter {
    * ```
    */
   async getUtxos(): Promise<UTxO[]> {
-    const deserializedUTxOs = await this.getUsedUTxOs();
-    return deserializedUTxOs.map((du) => fromTxUnspentOutput(du));
+    const utxos = (await this._walletInstance.getUtxos()) ?? [];
+    return utxos.map((utxo) => fromTxUnspentOutput(utxo));
   }
 
   /**
@@ -199,38 +202,39 @@ export class BrowserWallet implements ISigner, ISubmitter {
    * ```
    */
   signData(address: string, payload: string): Promise<DataSignature> {
-    const signerAddress = tsl.Address.fromString(address).toCbor().toString();
+    const signerAddress = Address.fromString(address).toCbor().toString();
     return this._walletInstance.signData(signerAddress, fromUTF8(payload));
   }
 
   /**
-   * Requests user to sign the provided transaction. The wallet should ask the user for permission, and if given, try to sign the supplied body and return a signed transaction. `partialSign` should be `true` if the transaction provided requires multiple signatures.
+   * Requests user to sign the provided transaction.
+   * The wallet should ask the user for permission, and if given, try to sign the supplied body and return a signed transaction.
+   * `partialSign` should be `true` if the transaction provided requires multiple signatures.
    * @param {Transaction} unsignedTx The Transaction object to be signed
    * @param {boolean} partialSign Must be true if the transaction provided requires multiple signatures. The default value is `false`.
    * @returns {Promise<Transaction>}
    * @see {@link https://meshjs.dev/apis/browserwallet#signTx}
    * @example
    * ```typescript
-   * const tx = new Transaction({ initiator: wallet });
+   * const tx = new Transaction({ creator: wallet });
    * const unsignedTx = await tx.build();
-   * const signedTx = await wallet.signTx(unsignedTx, false);
+   * const signedTx = await wallet.signTx(unsignedTx);
    */
   async signTx(unsignedTx: string, partialSign = false): Promise<string> {
     try {
-      const tx = tsl.Tx.fromCbor(unsignedTx);
+      const tx = Tx.fromCbor(unsignedTx);
 
       const newWitnessSet = await this._walletInstance
         .signTx(unsignedTx, partialSign);
 
-      const newSignatures = tsl.TxWitnessSet.fromCbor(newWitnessSet)
+      const newSignatures = TxWitnessSet.fromCbor(newWitnessSet)
         .vkeyWitnesses ?? [];
 
       const txWitnessSet = mergeSignatures(
-        tx.witnesses,
-        newSignatures,
+        tx.witnesses, newSignatures,
       );
 
-      const signedTx = new tsl.Tx({
+      const signedTx = new Tx({
         ...tx, witnesses: txWitnessSet,
       }).toCbor().toString();
 
@@ -241,13 +245,15 @@ export class BrowserWallet implements ISigner, ISubmitter {
   }
 
   /**
-   * As wallets should already have this ability to submit transaction, we allow dApps to request that a transaction be sent through it. If the wallet accepts the transaction and tries to send it, it shall return the transaction ID for the dApp to track. The wallet can return error messages or failure if there was an error in sending it.
+   * As wallets should already have this ability to submit transaction, we allow dApps to request that a transaction be sent through it.
+   * If the wallet accepts the transaction and tries to send it, it shall return the transaction hash for the dApp to track.
+   * The wallet can return error messages or failure if there was an error in sending it.
    * @param {Transaction} tx The Transaction object to be submitted
    * @returns {Promise<string>}
    * @see {@link https://meshjs.dev/apis/browserwallet#submitTx}
    * @example
    * ```typescript
-   * const tx = new Transaction({ initiator: wallet });
+   * const tx = new Transaction({ creator: wallet });
    * const unsignedTx = await tx.build();
    * const signedTx = await wallet.signTx(unsignedTx, false);
    * const txHash = await wallet.submitTx(signedTx);
@@ -257,21 +263,16 @@ export class BrowserWallet implements ISigner, ISubmitter {
     return this._walletInstance.submitTx(tx);
   }
 
-  async getUsedAddress(): Promise<tsl.Address> {
-    const usedAddresses = await this._walletInstance.getUsedAddresses();
-    return tsl.Address.fromBytes(usedAddresses[0]);
-  }
-
   async getUsedCollateral(
     limit = DEFAULT_PROTOCOL_PARAMETERS.maxCollateralInputs,
-  ): Promise<tsl.UTxO[]> {
-    const collateral = (await this._walletInstance.experimental.getCollateral()) ?? [];
-    return collateral.map((c) => tsl.UTxO.fromCbor(c)).slice(0, limit);
+  ): Promise<TxUnspentOutput[]> {
+    const collateral = await this.getCollateral(limit);
+    return collateral.map((c) => toTxUnspentOutput(c));
   }
 
-  async getUsedUTxOs(): Promise<tsl.UTxO[]> {
-    const utxos = (await this._walletInstance.getUtxos()) ?? [];
-    return utxos.map((u) => tsl.UTxO.fromCbor(u));
+  async getUsedUTxOs(): Promise<TxUnspentOutput[]> {
+    const utxos = await this.getUtxos();
+    return utxos.map((u) => toTxUnspentOutput(u));
   }
 
   /**
@@ -289,15 +290,13 @@ export class BrowserWallet implements ISigner, ISubmitter {
       .filter((v) => v.unit !== 'lovelace')
       .map((v) => {
         const policyId = v.unit.slice(0, POLICY_ID_LENGTH);
-        const assetName = v.unit.slice(POLICY_ID_LENGTH);
+        const assetName = toUTF8(v.unit.slice(POLICY_ID_LENGTH));
         const fingerprint = resolveFingerprint(policyId, assetName);
 
         return {
           unit: v.unit,
-          policyId,
-          assetName: toUTF8(assetName),
-          fingerprint,
-          quantity: v.quantity
+          quantity: v.quantity,
+          policyId, assetName, fingerprint,
         };
       });
   }
@@ -313,13 +312,14 @@ export class BrowserWallet implements ISigner, ISubmitter {
    */
   async getLovelace(): Promise<string> {
     const balance = await this.getBalance();
-    const nativeAsset = balance.find((v) => v.unit === 'lovelace');
-
-    return nativeAsset !== undefined ? nativeAsset.quantity : '0';
+    return balance.find(
+      (v) => v.unit === 'lovelace'
+    )?.quantity.toString() ?? '0';
   }
 
   /**
-   * Returns a list of assets from a policy ID. If no assets in wallet belongs to the policy ID, an empty list is returned. Query for a list of assets' policy ID with wallet.getPolicyIds().
+   * Returns a list of assets from a policy ID. If no assets in wallet belongs to the policy ID, an empty list is returned.
+   * Query for a list of assets' policy ID with wallet.getPolicyIds().
    * @param {string} policyId The policy ID of the assets to be returned.
    * @returns {Promise<AssetExtended[]>}
    * @see {@link https://meshjs.dev/apis/browserwallet#getPolicyIdAssets}
@@ -366,94 +366,4 @@ declare global {
   interface Window {
     cardano: Cardano;
   }
-}
-
-type Cardano = {
-  [key: string]: {
-    name: string;
-    icon: string;
-    apiVersion: string;
-    enable: () => Promise<WalletInstance>;
-  };
-};
-
-type WalletInstance = {
-  experimental: ExperimentalFeatures;
-  getBalance(): Promise<string>;
-  getChangeAddress(): Promise<string>;
-  getNetworkId(): Promise<number>;
-  getRewardAddresses(): Promise<string[]>;
-  getUnusedAddresses(): Promise<string[]>;
-  getUsedAddresses(): Promise<string[]>;
-  getUtxos(): Promise<string[] | undefined>;
-  signData(address: string, payload: string): Promise<DataSignature>;
-  signTx(tx: string, partialSign: boolean): Promise<string>;
-  submitTx(tx: string): Promise<string>;
-};
-
-type ExperimentalFeatures = {
-  getCollateral(): Promise<string[] | undefined>;
-};
-
-function fromValue(value: tsl.Value): Asset[] {
-  return value.map.flatMap(({ policy, assets }) => {
-    return policy === ''
-      ? { unit: 'lovelace', quantity: assets[''].toString() }
-      : Object.keys(assets).map((assetName) => ({
-          unit: `${policy.toString()}${fromUTF8(assetName)}`,
-          quantity: assets[assetName].toString()
-        }));
-  });
-}
-
-function fromTxUnspentOutput(utxo: tsl.UTxO): UTxO {
-  const dataHash = tsl.isData(utxo.resolved.datum)
-    ? fromBytes(tsl.hashData(utxo.resolved.datum).toBytes())
-    : utxo.resolved.datum?.toString();
-
-  const plutusData = tsl.isData(utxo.resolved.datum)
-    ? tsl.dataToCbor(utxo.resolved.datum).toString()
-    : undefined;
-
-  const scriptRef = utxo.resolved.refScript?.toCbor().toString();
-
-  return <UTxO>{
-    input: {
-      outputIndex: utxo.utxoRef.index,
-      txHash: utxo.utxoRef.id.toString(),
-    },
-    output: {
-      address: utxo.resolved.address.toString(),
-      amount: fromValue(utxo.resolved.value),
-      dataHash, plutusData, scriptRef,
-    },
-  };
-}
-
-function mergeSignatures(txWitnessSet: tsl.TxWitnessSet, newSignatures: tsl.VKeyWitness[]) {
-  const txSignatures = txWitnessSet.vkeyWitnesses;
-
-  if (txSignatures !== undefined) {
-    const signatures = new Set<string>();
-
-    txSignatures.forEach((signature) => {
-      signatures.add(signature.toCbor().toString());
-    });
-
-    newSignatures.forEach((signature) => {
-      signatures.add(signature.toCbor().toString());
-    });
-
-    return new tsl.TxWitnessSet({
-      ...txWitnessSet,
-      vkeyWitnesses: [...signatures].map(
-        (signature) => tsl.VKeyWitness.fromCbor(signature)
-      )
-    });
-  }
-
-  return new tsl.TxWitnessSet({
-    ...txWitnessSet,
-    vkeyWitnesses: newSignatures
-  });
 }
