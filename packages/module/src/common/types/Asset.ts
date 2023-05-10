@@ -9,6 +9,11 @@ export type Asset = {
   quantity: Quantity;
 };
 
-export const fromValue = (value: Value): Asset[] => value.toUnits();
+export const fromValue = (value: string | Value): Asset[] => {
+  if (typeof value === 'string')
+    return Value.fromCbor(value).toUnits();
+
+  return value.toUnits();
+}
 
 export const toValue = (assets: Asset[]): Value => Value.fromUnits(assets);

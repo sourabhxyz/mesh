@@ -18,7 +18,11 @@ export type UTxO = {
   };
 };
 
-export const fromTxUnspentOutput = (txUnspentOutput: TxUnspentOutput): UTxO => {
+export const fromTxUnspentOutput = (txUnspentOutput: string | TxUnspentOutput): UTxO => {
+  if (typeof txUnspentOutput === 'string') {
+    return fromTxUnspentOutput(TxUnspentOutput.fromCbor(txUnspentOutput));
+  }
+
   const plutusData = isData(txUnspentOutput.resolved.datum)
     ? dataToCbor(txUnspentOutput.resolved.datum).toString()
     : undefined;
