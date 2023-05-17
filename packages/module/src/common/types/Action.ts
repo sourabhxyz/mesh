@@ -30,7 +30,7 @@ export const toTxRedeemer = (action: Action): TxRedeemer => {
     tag: lookupRedeemerTag(action.tag),
     data: toPlutusData(action.data),
     execUnits: new ExBudget({
-      steps: action.budget.steps,
+      cpu: action.budget.steps,
       mem: action.budget.mem,
     }),
   });
