@@ -8,6 +8,7 @@ export * from './BlockInfo';
 export * from './Data';
 export * from './DataSignature';
 export * from './Era';
+export * from './Metadata';
 export * from './Mint';
 export * from './NativeScript';
 export * from './Network';
