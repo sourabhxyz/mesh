@@ -2,6 +2,6 @@ import { CborString, NativeScript, nativeScriptFromCbor, nativeScriptToCbor } fr
 
 export { NativeScript } from '@harmoniclabs/plu-ts';
 
-export const fromNativeScriptHex = (nativeScriptHex: string): NativeScript => nativeScriptFromCbor(new CborString(nativeScriptHex));
+export const fromNativeScriptCbor = (nativeScriptCbor: string): NativeScript => nativeScriptFromCbor(new CborString(nativeScriptCbor));
 
-export const toNativeScriptHex = (nativeScript: NativeScript): string => nativeScriptToCbor(nativeScript).toString();
+export const toNativeScriptCbor = (nativeScript: NativeScript): string => nativeScriptToCbor(nativeScript).toString();

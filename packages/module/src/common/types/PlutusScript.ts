@@ -12,11 +12,15 @@ export type PlutusScript = {
 
 export type PlutusVersion = keyof typeof ALL_PLUTUS_VERSIONS;
 
-export const fromScript = (script: Script): PlutusScript => {
+export const fromScript = (script: string | Script): PlutusScript => {
+  if (typeof script === 'string') {
+    return fromScript(Script.fromCbor(script));
+  }
+
   const version = Object.keys(ALL_PLUTUS_VERSIONS)
     .find((key) => ALL_PLUTUS_VERSIONS[key] === script.type);
 
-  if (version) {
+  if (version !== undefined) {
     return {
       version: version as PlutusVersion,
       code: script.cbor.toString(),
@@ -27,5 +31,5 @@ export const fromScript = (script: Script): PlutusScript => {
 };
 
 export const toScript = (plutusScript: PlutusScript): Script => {
-  return new Script(ALL_PLUTUS_VERSIONS[plutusScript.version], Buffer.from(plutusScript.code, 'hex'));
+  return new Script(ALL_PLUTUS_VERSIONS[plutusScript.version], plutusScript.code);
 };

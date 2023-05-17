@@ -10,8 +10,9 @@ export type Asset = {
 };
 
 export const fromValue = (value: string | Value): Asset[] => {
-  if (typeof value === 'string')
-    return Value.fromCbor(value).toUnits();
+  if (typeof value === 'string') {
+    return fromValue(Value.fromCbor(value));
+  }
 
   return value.toUnits();
 }
